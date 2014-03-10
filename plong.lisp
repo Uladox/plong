@@ -19,23 +19,25 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(defparameter *width* 640)
-(defparameter *height* 480)
+(defpackage :plong
+  (:use :cl :xelf)
+  (:export plong))
+
+(in-package :plong)
 
 (defparameter *unit* 16)
 
 (defun units (n) (* *unit* n))
 
-(xelf:define-project plong
-  :width *width*
-  :height *height*)
-
-(in-package :plong)
+(defparameter *width* 640)
+(defparameter *height* 480)
 
 (define ball
   :image "ball.png"
   :speed 4
-  :heading (direction-heading :up))
+  :heading (direction-heading :downright))
+
+(defun ball () (field-value :ball (current-buffer)))
 
 (defmethod run ((self ball))
   (with-fields (heading speed) self
@@ -51,10 +53,13 @@
     (incf heading (radian-angle 90))
     (play-sample "bounce.wav")))
 
+(defparameter *brick-width* (units 3))
+(defparameter *brick-height* (units 2))
+
 (define brick
-  :color "red"
-  :height 40
-  :width 100)
+  :color (random-choose '("red" "orange" "yellow"))
+  :height *brick-height*
+  :width *brick-width*)
 
 (defmethod collide ((self ball) (brick brick))
   (with-fields (heading) self
@@ -70,13 +75,41 @@
   :direction nil
   :image "paddle.png")
 
+(defun paddle () (field-value :paddle (current-buffer)))
+
+(defparameter *paddle-speed* 3)
+
+(defun holding-left-arrow ()
+  (or (joystick-button-pressed-p :left)
+      (keyboard-down-p :kp4)
+      (keyboard-down-p :left)))
+
+(defun holding-right-arrow ()
+  (or (joystick-button-pressed-p :right)
+      (keyboard-down-p :kp6)
+      (keyboard-down-p :right)))
+
+(defmethod run ((self paddle))
+  (with-fields (direction) self
+    (setf direction
+	  (cond ((holding-left-arrow) :left)
+		((holding-right-arrow) :right)))
+    (when direction
+      (move self direction *paddle-speed*))))
+
+(defmethod collide ((self paddle) (wall wall))
+  (with-fields (heading) self
+    (setf heading (opposite-heading heading))
+    (move self heading *paddle-speed*)))
+
 (defmethod english ((self paddle))
-  (with-fields (direction heading) self
+  (with-fields (direction) self
     (case direction
       (:left (direction-heading :upleft))
       (:right (direction-heading :upright))
-      (otherwise (+ heading (radian-angle 90))))))
-    
+      (otherwise (+ (field-value :heading (ball))
+		    (radian-angle 90))))))
+
 (defmethod collide ((self ball) (paddle paddle))
   (with-fields (heading speed) self
     (setf heading (english paddle))
@@ -105,6 +138,15 @@
       ;; send it back
       (current-buffer))))
 
+(defun make-puzzle ()
+  (with-new-buffer
+    (dotimes (row 5)
+      (dotimes (column 8)
+	(insert (new 'brick) 
+		(* column *brick-width*)
+		(* row *brick-height*))))
+    (current-buffer)))
+
 (define (plong buffer)
   :paddle (new 'paddle)
   :ball (new 'ball)
@@ -112,9 +154,24 @@
   :width *width*
   :height *height*)
 
-(defun paddle () (field-value :paddle (current-buffer)))
-(defun ball () (field-value :ball (current-buffer)))
+(defmethod reset ((self plong))
+  (with-fields (ball paddle) self
+    (with-buffer self
+      (insert ball)
+      (insert paddle)
+      (move-to ball 80 280)
+      (move-to paddle 110 400)
+      (paste-from self (make-border 0 0 620 460))
+      (paste-from self (make-puzzle) 110 110))))
 
-
+(defun plong ()
+  (with-session
+    (open-project :plong 
+		  :path "/home/dto/plong/"
+		  :width *width* :height *height*)
+    (let ((plong (new 'plong)))
+      (switch-to-buffer plong)
+      (reset plong)
+      (start-session))))
 
 ;;; plong.lisp ends here
