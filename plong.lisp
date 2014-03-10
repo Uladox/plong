@@ -41,7 +41,7 @@
 
 (defun ball () (field-value :ball (current-buffer)))
 
-(defmethod run ((self ball))
+(defmethod update ((self ball))
   (with-fields (heading speed) self
     (move self heading speed)))
 
@@ -52,8 +52,7 @@
   (with-fields (heading speed) self
     ;; back away from wall
     (move self (opposite-heading heading) speed)
-    (incf heading (radian-angle 90))
-    (play-sample "bounce.wav")))
+    (incf heading (radian-angle 90))))
 
 (defparameter *brick-width* (units 3))
 (defparameter *brick-height* (units 2))
@@ -68,11 +67,6 @@
     (destroy brick)
     (incf heading (radian-angle 90))))
 
-(define-resource "bip.wav" :volume 30)
-
-(defmethod destroy :after ((self brick))
-  (play-sample "bip.wav"))
-   
 (define paddle 
   :direction nil
   :height (units 1)
@@ -93,13 +87,13 @@
       (keyboard-down-p :kp6)
       (keyboard-down-p :right)))
 
-(defmethod run ((self paddle))
+(defmethod update ((self paddle))
   (with-fields (direction) self
     (setf direction
 	  (cond ((holding-left-arrow) :left)
 		((holding-right-arrow) :right)))
     (when direction
-      (move self direction *paddle-speed*))))
+      (move self (direction-heading direction) *paddle-speed*))))
 
 (defmethod collide ((self paddle) (wall wall))
   (with-fields (heading) self
@@ -170,11 +164,9 @@
 
 (defun plong ()
   (with-session
-    (load-project "plong")
-;; (open-project :plong 
-;; 		  :path #P"/home/dto/plong/"
-;; 		  :width *width* :height *height*)
-    (load-project "plong")
+      (open-project :plong 
+		    :path #P"/home/dto/plong/"
+		    :width *width* :height *height*)
     (index-all-images)
     (preload-resources)
     ;;    (index-pending-resources)
