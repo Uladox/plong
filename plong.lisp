@@ -33,7 +33,9 @@
 (defparameter *height* 480)
 
 (define ball
-  :image "ball.png"
+  :height (units 1)
+  :width (units 1)
+  :color "white"
   :speed 4
   :heading (direction-heading :downright))
 
@@ -66,14 +68,16 @@
     (destroy brick)
     (incf heading (radian-angle 90))))
 
-(defresource "bip.wav" :volume 30)
+(define-resource "bip.wav" :volume 30)
 
 (defmethod destroy :after ((self brick))
   (play-sample "bip.wav"))
    
 (define paddle 
   :direction nil
-  :image "paddle.png")
+  :height (units 1)
+  :width (units 8)
+  :color "white")
 
 (defun paddle () (field-value :paddle (current-buffer)))
 
@@ -166,12 +170,18 @@
 
 (defun plong ()
   (with-session
-    (open-project :plong 
-		  :path "/home/dto/plong/"
-		  :width *width* :height *height*)
+    (load-project "plong")
+;; (open-project :plong 
+;; 		  :path #P"/home/dto/plong/"
+;; 		  :width *width* :height *height*)
+    (load-project "plong")
+    (index-all-images)
+    (preload-resources)
+    ;;    (index-pending-resources)
     (let ((plong (new 'plong)))
       (switch-to-buffer plong)
       (reset plong)
+      (play)
       (start-session))))
 
 ;;; plong.lisp ends here
