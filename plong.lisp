@@ -36,7 +36,7 @@
   :height (units 1)
   :width (units 1)
   :color "white"
-  :speed 4
+  :speed 6
   :heading (direction-heading :downright))
 
 (defun ball () (field-value :ball (current-buffer)))
