@@ -1,5 +1,4 @@
-;;; plong.lisp --- a simple ball-and-paddle example for Xelf
-;;                     ... with a mondrian twist
+;;; plong.lisp --- a simple remixable ball-and-paddle example for Xelf
 
 ;; Copyright (C) 2014  David O'Toole
 
@@ -32,48 +31,59 @@
 (defparameter *width* 640)
 (defparameter *height* 480)
 
-(define ball
-  :height (units 1)
-  :width (units 1)
-  :color "white"
-  :speed 6
-  :heading (direction-heading :downright))
+;;; A bouncing ball
 
-(defun ball () (field-value :ball (current-buffer)))
+(defclass ball (xelf:node)
+  ((height :initform (units 1))
+   (width :initform (units 1))
+   (color :initform "white")
+   (speed :initform 6)
+   (heading :initform (direction-heading :downright))))
+
+(defun ball () (slot-value (current-buffer) 'ball))
 
 (defmethod update ((self ball))
-  (with-fields (heading speed) self
+  (with-slots (heading speed) self
     (move self heading speed)))
 
-(define wall
-  :color "gray50")
+;;; Walls for the ball to bounce off of
+
+(defclass wall (node)
+  ((color :initform "gray50")))
    
-(defmethod collide ((self ball) (wall wall))
-  (with-fields (heading speed) self
+(defmethod collide ((ball ball) (wall wall))
+  (with-slots (heading speed x y) ball
     ;; back away from wall
-    (move self (opposite-heading heading) speed)
-    (incf heading (radian-angle 90))))
+    (move ball (opposite-heading heading) speed)
+    (aim ball (heading-between ball (paddle)))
+    (percent-of-time 10 (incf heading (radian-angle 90)))))
+    
+(defparameter *brick-width* (units 2))
+(defparameter *brick-height* (units 1.2))
 
-(defparameter *brick-width* (units 3))
-(defparameter *brick-height* (units 2))
+(defclass brick (node)
+  ((color :initform "gray60")
+   (height :initform *brick-height*)
+   (width :initform *brick-width*)))
 
-(define brick
-  :color (random-choose '("red" "orange" "yellow"))
-  :height *brick-height*
-  :width *brick-width*)
+(defmethod initialize-instance :after ((brick brick) &key color)
+  (when color
+    (setf (slot-value brick 'color) color)))
 
 (defmethod collide ((self ball) (brick brick))
-  (with-fields (heading) self
+  (with-slots (heading) self
     (destroy brick)
     (incf heading (radian-angle 90))))
 
-(define paddle 
-  :direction nil
-  :height (units 1)
-  :width (units 8)
-  :color "white")
+;;; The player's paddle control
 
-(defun paddle () (field-value :paddle (current-buffer)))
+(defclass paddle (node)
+  ((direction :initform nil)
+   (height :initform (units 1))
+   (width :initform (units 8))
+   (color :initform "white")))
+
+(defun paddle () (slot-value (current-buffer) 'paddle))
 
 (defparameter *paddle-speed* 3)
 
@@ -87,36 +97,38 @@
       (keyboard-down-p :kp6)
       (keyboard-down-p :right)))
 
-(defmethod update ((self paddle))
-  (with-fields (direction) self
+(defmethod update ((paddle paddle))
+  (with-slots (direction) paddle
     (setf direction
 	  (cond ((holding-left-arrow) :left)
 		((holding-right-arrow) :right)))
     (when direction
-      (move self (direction-heading direction) *paddle-speed*))))
+      (move paddle (direction-heading direction) *paddle-speed*))))
 
-(defmethod collide ((self paddle) (wall wall))
-  (with-fields (heading) self
+(defmethod collide ((paddle paddle) (wall wall))
+  (with-slots (heading) paddle
     (setf heading (opposite-heading heading))
-    (move self heading *paddle-speed*)))
+    (move paddle heading (* *paddle-speed* 2))))
 
-(defmethod english ((self paddle))
-  (with-fields (direction) self
+(defmethod english ((paddle paddle))
+  (with-slots (direction) paddle
     (case direction
       (:left (direction-heading :upleft))
       (:right (direction-heading :upright))
-      (otherwise (+ (field-value :heading (ball))
+      (otherwise (+ (slot-value (ball) 'heading)
 		    (radian-angle 90))))))
 
-(defmethod collide ((self ball) (paddle paddle))
-  (with-fields (heading speed) self
+(defmethod collide ((ball ball) (paddle paddle))
+  (with-slots (heading speed) ball
     (setf heading (english paddle))
-    (move self heading speed)))
+    (move ball heading speed)))
+
+;;; Parts of the game board
 
 (defun make-wall (x y width height)
-  (let ((wall (new 'wall)))
-    (xelf:resize wall width height)
-    (xelf:move-to wall x y)
+  (let ((wall (make-instance 'wall)))
+    (resize wall width height)
+    (move-to wall x y)
     wall))
 
 (defun make-border (x y width height)
@@ -125,7 +137,7 @@
 	(right (+ x width))
 	(bottom (+ y height)))
     (with-new-buffer
-    ;; top wall
+      ;; top wall
       (insert (make-wall left top (- right left) (units 1)))
       ;; bottom wall
       (insert (make-wall left bottom (- right left (units -1)) (units 1)))
@@ -133,47 +145,53 @@
       (insert (make-wall left top (units 1) (- bottom top)))
       ;; right wall
       (insert (make-wall right top (units 1) (- bottom top (units -1))))
-      ;; send it back
+      ;; send it all back
       (current-buffer))))
+
+(defparameter *row-colors* 
+  '("dark orchid" "medium orchid" "orchid" "dark orange" "orange" "gold"))
+
+(defun row-color (row)
+  (nth (mod row (length *row-colors*))
+       *row-colors*))
 
 (defun make-puzzle ()
   (with-new-buffer
-    (dotimes (row 5)
-      (dotimes (column 8)
-	(insert (new 'brick) 
-		(* column *brick-width*)
-		(* row *brick-height*))))
-    (current-buffer)))
+    (dotimes (row 6)
+      (dotimes (column 17)
+	(add-node (current-buffer)
+		  (make-instance 'brick :color (row-color row))
+		  (+ 50 (* column *brick-width*))
+		  (+ 50 (* row *brick-height*)))))))
 
-(define (plong buffer)
-  :paddle (new 'paddle)
-  :ball (new 'ball)
-  :background-color "black"
-  :width *width*
-  :height *height*)
+;;; The buffer class for the game
 
-(defmethod reset ((self plong))
-  (with-fields (ball paddle) self
-    (with-buffer self
+(defclass plong (xelf:buffer)
+  ((paddle :initform (make-instance 'paddle))
+   (ball :initform (make-instance 'ball))
+   (background-color :initform "black")
+   (width :initform *width*)
+   (height :initform *height*)))
+
+(defmethod reset-game ((plong plong))
+  (with-slots (ball paddle) plong
+    (with-buffer plong
+      (bind-event plong '(:r :control) 'reset-game)
       (insert ball)
       (insert paddle)
       (move-to ball 80 280)
       (move-to paddle 110 400)
-      (paste-from self (make-border 0 0 620 460))
-      (paste-from self (make-puzzle) 110 110))))
+      (paste plong (make-border 0 0 (- *width* (units 1)) (- *height* (units 1))))
+      (paste plong (make-puzzle)))))
 
 (defun plong ()
+  (setf *resizable* t)
+  (setf *scale-output-to-window* t)
   (with-session
-      (open-project :plong 
-		    :path #P"/home/dto/plong/"
-		    :width *width* :height *height*)
+    (open-project :plong)
     (index-all-images)
-    (preload-resources)
-    ;;    (index-pending-resources)
-    (let ((plong (new 'plong)))
+    (let ((plong (make-instance 'plong)))
       (switch-to-buffer plong)
-      (reset plong)
-      (play)
-      (start-session))))
+      (reset-game plong))))
 
 ;;; plong.lisp ends here
