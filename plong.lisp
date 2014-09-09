@@ -57,6 +57,13 @@
     (move ball (opposite-heading heading) speed)
     (aim ball (heading-between ball (paddle)))
     (percent-of-time 10 (incf heading (radian-angle 90)))))
+
+(defresource "bip.wav" :volume 20)
+
+(defmethod collide :after ((ball ball) (node node))
+  (play-sample "bip.wav"))
+
+;;; Bricks to bash 
     
 (defparameter *brick-width* (units 2))
 (defparameter *brick-height* (units 1.2))
@@ -190,6 +197,8 @@
   (with-session
     (open-project :plong)
     (index-all-images)
+    (index-pending-resources)
+    (preload-resources)
     (let ((plong (make-instance 'plong)))
       (switch-to-buffer plong)
       (reset-game plong))))
