@@ -153,14 +153,27 @@
   (or (keyboard-down-p :kp6)
       (keyboard-down-p :right)))
 
+(defun find-joystick-direction ()
+  (let ((heading (when (left-analog-stick-pressed-p)
+		   (left-analog-stick-heading))))
+    (when heading 
+      (if (and (> heading (/ pi 2))
+	       (< heading (* 3 (/ pi 2))))
+	  :left 
+	  :right))))
+
+(defun find-direction ()
+  (or (when (plusp (number-of-joysticks))
+	(find-joystick-direction))
+      (cond ((holding-left-arrow) :left)
+	    ((holding-right-arrow) :right))))
+
 ;; In the paddle's UPDATE method, we read the inputs and move the
 ;; paddle accordingly.
 
 (defmethod update ((paddle paddle))
   (with-slots (direction) paddle
-    (setf direction
-	  (cond ((holding-left-arrow) :left)
-		((holding-right-arrow) :right)))
+    (setf direction (find-direction))
     (when direction
       (move paddle (direction-heading direction) *paddle-speed*))))
 
