@@ -180,9 +180,9 @@
 ;; The paddle should bounce back from the walls, too.
 
 (defmethod collide ((paddle paddle) (wall wall))
-  (with-slots (heading) paddle
-    (setf heading (opposite-heading heading))
-    (move paddle heading (* *paddle-speed* 2))))
+  (with-slots (direction) paddle
+    (setf direction (opposite-direction direction))
+    (move paddle (direction-heading direction) (* *paddle-speed* 2))))
 
 ;; The "english" is the directional force applied to the ball because
 ;; of the player's moving the paddle to the left or right at the
