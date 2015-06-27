@@ -2,3 +2,10 @@ plong
 =====
 
 a simple ball-and-paddle example for Xelf
+
+Note, for shelly users the command:
+
+      	  shly start
+
+      should allow the game to be started
+      from the terminal.
